@@ -31,16 +31,15 @@ app.on('ready', () => {
 
 // Handle PNG to ICO conversion
 ipcMain.on('convert-png', (event, { name, data }) => {
-    console.log(`Received file for conversion: ${name}`);
-    
-    const base64Data = data.split(',')[1]; // Remove the data URL prefix
+    const base64Data = data.split(',')[1];
     const buffer = Buffer.from(base64Data, 'base64');
     const tempPngPath = path.join(app.getPath('temp'), name);
     const icoPath = tempPngPath.replace('.png', '.ico');
 
+    // Save the PNG file to a temporary directory
     fs.writeFile(tempPngPath, buffer, (err) => {
         if (err) {
-            console.error(`Error saving file: ${err.message}`);
+            console.error(`Error saving PNG file: ${err.message}`);
             event.reply('conversion-complete', `Error: Failed to save PNG file`);
             return;
         }
@@ -50,12 +49,14 @@ ipcMain.on('convert-png', (event, { name, data }) => {
         // Convert PNG to ICO
         pngToIco(tempPngPath)
             .then((icoBuffer) => {
+                // Save the ICO file
                 fs.writeFile(icoPath, icoBuffer, (err) => {
                     if (err) {
                         console.error(`Error saving ICO file: ${err.message}`);
                         event.reply('conversion-complete', `Error: Failed to save ICO file`);
                     } else {
                         console.log(`ICO file saved to: ${icoPath}`);
+                        // Only reply to the renderer after the ICO is saved
                         event.reply('conversion-complete', `File converted: ${icoPath}`);
                     }
                 });
@@ -66,6 +67,7 @@ ipcMain.on('convert-png', (event, { name, data }) => {
             });
     });
 });
+
 
 
 app.on('window-all-closed', () => {
