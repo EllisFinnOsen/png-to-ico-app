@@ -33,7 +33,6 @@ app.on('ready', () => {
 ipcMain.on('convert-png', (event, { name, data }) => {
     console.log(`Received file for conversion: ${name}`);
     
-    // Decode the base64 data and save the PNG file to a temporary location
     const base64Data = data.split(',')[1]; // Remove the data URL prefix
     const buffer = Buffer.from(base64Data, 'base64');
     const tempPngPath = path.join(app.getPath('temp'), name);
@@ -42,7 +41,7 @@ ipcMain.on('convert-png', (event, { name, data }) => {
     fs.writeFile(tempPngPath, buffer, (err) => {
         if (err) {
             console.error(`Error saving file: ${err.message}`);
-            event.reply('conversion-complete', `Error: ${err.message}`);
+            event.reply('conversion-complete', `Error: Failed to save PNG file`);
             return;
         }
 
@@ -54,7 +53,7 @@ ipcMain.on('convert-png', (event, { name, data }) => {
                 fs.writeFile(icoPath, icoBuffer, (err) => {
                     if (err) {
                         console.error(`Error saving ICO file: ${err.message}`);
-                        event.reply('conversion-complete', `Error: ${err.message}`);
+                        event.reply('conversion-complete', `Error: Failed to save ICO file`);
                     } else {
                         console.log(`ICO file saved to: ${icoPath}`);
                         event.reply('conversion-complete', `File converted: ${icoPath}`);
@@ -63,10 +62,11 @@ ipcMain.on('convert-png', (event, { name, data }) => {
             })
             .catch((err) => {
                 console.error(`Error converting to ICO: ${err.message}`);
-                event.reply('conversion-complete', `Error: ${err.message}`);
+                event.reply('conversion-complete', `Error: Failed to convert PNG to ICO`);
             });
     });
 });
+
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
