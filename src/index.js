@@ -1,29 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import { useState } from 'react';
 
-console.log('Is ipcRenderer available?', window.ipcRenderer);
 const App = () => {
-    console.log('Is global defined?', typeof global);
     const [status, setStatus] = useState('Drag a PNG file here!');
+    const [convertedFile, setConvertedFile] = useState(null); // Store the converted file path
 
     const handleDrop = (event) => {
         event.preventDefault();
         const file = event.dataTransfer.files[0];
-    
+
         if (file && file.type === 'image/png') {
             setStatus('Converting...');
+            setConvertedFile(null); // Clear previous conversion
+
             const reader = new FileReader();
             reader.onload = () => {
-                const fileData = reader.result; // Base64 string
-    
+                const fileData = reader.result;
+
                 if (window.ipcRenderer) {
+                    // Send file data to the main process
                     window.ipcRenderer.send('convert-png', { name: file.name, data: fileData });
-    
+
+                    // Listen for completion
                     window.ipcRenderer.on('conversion-complete', (message) => {
-                        setStatus(message); // Display the result
-                        //test
-                        console.log('Conversion result:', message);
+                        if (message.startsWith('File converted:')) {
+                            const filePath = message.split(': ')[1];
+                            setConvertedFile(filePath); // Store the converted file path
+                            setStatus('Conversion complete!');
+                        } else {
+                            setStatus(message); // Display error
+                        }
                     });
                 } else {
                     console.error('ipcRenderer is not available');
@@ -35,14 +41,6 @@ const App = () => {
             setStatus('Please drop a valid PNG file.');
         }
     };
-    
-    
-    
-    
-    
-    
-    
-    
 
     return (
         <div
@@ -52,12 +50,31 @@ const App = () => {
                 width: '100%',
                 height: '100vh',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 border: '2px dashed #aaa',
+                backgroundColor: status === 'Converting...' ? '#f0f0f0' : 'white',
+                transition: 'background-color 0.3s ease',
             }}
         >
-            <p>{status}</p>
+            {/* Status or Spinner */}
+            {status === 'Converting...' ? (
+                <div className="spinner" style={{ marginBottom: '20px' }}></div>
+            ) : (
+                <p>{status}</p>
+            )}
+
+            {/* Converted File Link */}
+            {convertedFile && (
+                <a
+                    href={`file://${convertedFile}`}
+                    download
+                    style={{ marginTop: '20px', textDecoration: 'none', color: '#007BFF' }}
+                >
+                    Download Converted Icon
+                </a>
+            )}
         </div>
     );
 };
