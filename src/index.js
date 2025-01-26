@@ -11,27 +11,33 @@ const App = () => {
         event.preventDefault();
         const file = event.dataTransfer.files[0];
     
-        // Attempt to get the full file path
-        const filePath = file?.path || event.dataTransfer.items[0].getAsFile()?.path;
-    
-        if (file && file.type === 'image/png' && filePath) {
+        if (file && file.type === 'image/png') {
             setStatus('Converting...');
-            console.log('Dropped file path:', filePath); // Debug log
+            const reader = new FileReader();
+            reader.onload = () => {
+                const fileData = reader.result; // Base64 string
     
-            if (window.ipcRenderer) {
-                window.ipcRenderer.send('convert-png', filePath);
+                if (window.ipcRenderer) {
+                    window.ipcRenderer.send('convert-png', { name: file.name, data: fileData });
     
-                window.ipcRenderer.on('conversion-complete', (message) => {
-                    setStatus(message);
-                });
-            } else {
-                console.error('ipcRenderer is not available');
-                setStatus('Error: Unable to process file.');
-            }
+                    window.ipcRenderer.on('conversion-complete', (message) => {
+                        setStatus(message); // Display the result
+                        //test
+                        console.log('Conversion result:', message);
+                    });
+                } else {
+                    console.error('ipcRenderer is not available');
+                    setStatus('Error: Unable to process file.');
+                }
+            };
+            reader.readAsDataURL(file);
         } else {
             setStatus('Please drop a valid PNG file.');
         }
     };
+    
+    
+    
     
     
     
