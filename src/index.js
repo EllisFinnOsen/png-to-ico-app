@@ -6,8 +6,8 @@ const App = () => {
     const [isDragging, setIsDragging] = useState(false);
     const [convertedFile, setConvertedFile] = useState([]);
 
-    // Define the listener for "conversion-complete"
     const handleConversionComplete = (message) => {
+        console.log('Received conversion-complete message:', message); // Debug log
         if (message.startsWith('File converted:')) {
             const filePath = message.split(': ')[1];
             setConvertedFile((prev) => [...prev, filePath]);
@@ -16,6 +16,7 @@ const App = () => {
             setStatus(message);
         }
     };
+    
 
     const handleDrop = (event) => {
         event.preventDefault();
@@ -30,12 +31,15 @@ const App = () => {
         }
 
         setStatus('Converting...');
-        setConvertedFile([]); // Clear previous conversions
+        setTimeout(() => {
+            if (status === 'Converting...') {
+                setStatus('Conversion timed out. Please try again.');
+            }
+        }, 10000); // 10 seconds timeout
+        
+        setConvertedFile([]);
 
-        // Remove previous listener for "conversion-complete"
         window.ipcRenderer.removeListener('conversion-complete', handleConversionComplete);
-
-        // Register the listener
         window.ipcRenderer.on('conversion-complete', handleConversionComplete);
 
         pngFiles.forEach((file) => {
@@ -54,49 +58,87 @@ const App = () => {
         });
     };
 
+    const handleDownloadAll = () => {
+        if (convertedFile.length === 0) {
+            setStatus('No files to download.');
+            return;
+        }
+    
+        // Send request to select directory
+        window.ipcRenderer.send('select-directory', convertedFile);
+    
+        // Clean up any previous listeners
+        window.ipcRenderer.removeAllListeners('directory-selected');
+    
+        // Add a fresh listener for directory selection
+        window.ipcRenderer.on('directory-selected', (message) => {
+            setStatus(message); // Update status with the result
+        });
+    };
+    
+    
+
     return (
-        <div
-            onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            style={{
-                width: '100%',
-                height: '100vh',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '2px dashed #aaa',
-                backgroundColor: isDragging ? '#e0f7fa' : status === 'Converting...' ? '#f0f0f0' : 'white',
-                transition: 'background-color 0.3s ease',
-            }}
-        >
-            {status === 'Converting...' ? (
-                <div className="spinner" style={{ marginBottom: '20px' }}></div>
-            ) : (
-                <p>{status}</p>
-            )}
-            {convertedFile.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                    {convertedFile.map((filePath, index) => (
-                        <a
-                            key={index}
-                            href={`file://${filePath}`}
-                            download
-                            className="download-link"
-                            style={{ display: 'block', marginBottom: '10px' }}
+        <>
+            <div
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                className={`drop-zone ${isDragging ? 'dragging' : ''} ${status === 'Converting...' ? 'converting' : ''}`}
+                style={{
+                    width: '100%',
+                    height: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '2px dashed #aaa',
+                    backgroundColor: isDragging ? '#e0f7fa' : status === 'Converting...' ? '#f0f0f0' : 'white',
+                    transition: 'background-color 0.3s ease',
+                }}
+            >
+                {status === 'Converting...' ? (
+                    <div className="spinner" style={{ marginBottom: '20px' }}></div>
+                ) : (
+                    <p>{status}</p>
+                )}
+                {convertedFile.length > 0 && (
+                    <div style={{ marginTop: '20px' }}>
+                        {convertedFile.map((filePath, index) => (
+                            <a
+                                key={index}
+                                href={`file://${filePath}`}
+                                download
+                                className="download-link"
+                                style={{ display: 'block', marginBottom: '10px' }}
+                            >
+                                Download {filePath.split('\\').pop()}
+                            </a>
+                        ))}
+                        <button
+                            onClick={handleDownloadAll}
+                            style={{
+                                marginTop: '20px',
+                                padding: '10px 20px',
+                                cursor: 'pointer',
+                                backgroundColor: '#007BFF',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                            }}
                         >
-                            Download {filePath.split('\\').pop()}
-                        </a>
-                    ))}
-                </div>
-            )}
-        </div>
+                            Download All
+                        </button>
+                    </div>
+                )}
+            </div>
+        </>
     );
 };
+
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

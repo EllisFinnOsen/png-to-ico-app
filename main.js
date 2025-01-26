@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const pngToIco = require('png-to-ico'); // Import the library
@@ -31,6 +31,7 @@ app.on('ready', () => {
 
 // Handle PNG to ICO conversion
 ipcMain.on('convert-png', (event, { name, data }) => {
+    console.log(`Received file for conversion: ${name}`);
     const base64Data = data.split(',')[1];
     const buffer = Buffer.from(base64Data, 'base64');
     const tempPngPath = path.join(app.getPath('temp'), name);
@@ -40,7 +41,7 @@ ipcMain.on('convert-png', (event, { name, data }) => {
     fs.writeFile(tempPngPath, buffer, (err) => {
         if (err) {
             console.error(`Error saving PNG file: ${err.message}`);
-            event.reply('conversion-complete', `Error: Failed to save PNG file`);
+            event.reply('conversion-complete', `Error: Failed to save PNG file.`);
             return;
         }
 
@@ -53,20 +54,66 @@ ipcMain.on('convert-png', (event, { name, data }) => {
                 fs.writeFile(icoPath, icoBuffer, (err) => {
                     if (err) {
                         console.error(`Error saving ICO file: ${err.message}`);
-                        event.reply('conversion-complete', `Error: Failed to save ICO file`);
+                        event.reply('conversion-complete', `Error: Failed to save ICO file.`);
                     } else {
                         console.log(`ICO file saved to: ${icoPath}`);
-                        // Only reply to the renderer after the ICO is saved
                         event.reply('conversion-complete', `File converted: ${icoPath}`);
                     }
                 });
             })
             .catch((err) => {
                 console.error(`Error converting to ICO: ${err.message}`);
-                event.reply('conversion-complete', `Error: Failed to convert PNG to ICO`);
+                event.reply('conversion-complete', `Error: Failed to convert PNG to ICO.`);
             });
     });
 });
+
+// Handle directory selection
+ipcMain.on('select-directory', (event, convertedFiles) => {
+    console.log('Received request to select directory with files:', convertedFiles); // Debug log
+    dialog.showOpenDialog({
+        properties: ['openDirectory'],
+    }).then((result) => {
+        if (!result.canceled) {
+            const selectedDir = result.filePaths[0];
+            console.log('Directory selected:', selectedDir); // Debug log
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            convertedFiles.forEach((filePath) => {
+                const fileName = path.basename(filePath);
+                const destination = path.join(selectedDir, fileName);
+
+                fs.copyFile(filePath, destination, (err) => {
+                    if (err) {
+                        console.error(`Error copying file ${fileName}: ${err.message}`);
+                        errorCount++;
+                    } else {
+                        console.log(`File copied to: ${destination}`);
+                        successCount++;
+                    }
+
+                    // Send status back to renderer when all files are processed
+                    if (successCount + errorCount === convertedFiles.length) {
+                        event.reply(
+                            'directory-selected',
+                            `${successCount} file(s) saved successfully. ${errorCount} error(s).`
+                        );
+                    }
+                });
+            });
+        } else {
+            console.log('Directory selection canceled'); // Debug log
+            event.reply('directory-selected', 'Directory selection canceled.');
+        }
+    }).catch((err) => {
+        console.error('Error selecting directory:', err.message);
+        event.reply('directory-selected', 'Error selecting directory.');
+    });
+});
+
+
 
 
 

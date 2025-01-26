@@ -9,15 +9,21 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
         }
     },
     on: (channel, callback) => {
-        const validChannels = ['conversion-complete', 'selected-directory'];
+        const validChannels = ['conversion-complete', 'directory-selected'];
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, (event, ...args) => callback(...args));
         }
     },
     removeListener: (channel, callback) => {
-        const validChannels = ['conversion-complete', 'selected-directory'];
+        const validChannels = ['conversion-complete', 'directory-selected'];
         if (validChannels.includes(channel)) {
             ipcRenderer.removeListener(channel, callback);
+        }
+    },
+    removeAllListeners: (channel) => {
+        const validChannels = ['conversion-complete', 'directory-selected'];
+        if (validChannels.includes(channel)) {
+            ipcRenderer.removeAllListeners(channel);
         }
     },
 });
