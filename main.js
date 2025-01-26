@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const sharp = require('sharp');
+const pngToIco = require('png-to-ico'); // Import the library
 
 let mainWindow;
 
@@ -29,37 +29,42 @@ app.on('ready', () => {
     }
 });
 
-// Handle file conversion request
+// Handle PNG to ICO conversion
 ipcMain.on('convert-png', (event, { name, data }) => {
     console.log(`Received file for conversion: ${name}`);
     
-    // Decode the base64 data
+    // Decode the base64 data and save the PNG file to a temporary location
     const base64Data = data.split(',')[1]; // Remove the data URL prefix
     const buffer = Buffer.from(base64Data, 'base64');
+    const tempPngPath = path.join(app.getPath('temp'), name);
+    const icoPath = tempPngPath.replace('.png', '.ico');
 
-    // Save the file to a temporary location
-    const tempPath = path.join(app.getPath('temp'), name);
-    const icoPath = tempPath.replace('.png', '.ico'); // Set .ico output path
-
-    fs.writeFile(tempPath, buffer, (err) => {
+    fs.writeFile(tempPngPath, buffer, (err) => {
         if (err) {
             console.error(`Error saving file: ${err.message}`);
             event.reply('conversion-complete', `Error: ${err.message}`);
-        } else {
-            console.log(`File saved to: ${tempPath}`);
-            // Convert the saved PNG to ICO
-            sharp(tempPath)
-                .resize(256, 256) // Resize for ICO
-                .toFile(icoPath, (err) => {
+            return;
+        }
+
+        console.log(`PNG file saved to: ${tempPngPath}`);
+
+        // Convert PNG to ICO
+        pngToIco(tempPngPath)
+            .then((icoBuffer) => {
+                fs.writeFile(icoPath, icoBuffer, (err) => {
                     if (err) {
-                        console.error(`Error converting to ICO: ${err.message}`);
+                        console.error(`Error saving ICO file: ${err.message}`);
                         event.reply('conversion-complete', `Error: ${err.message}`);
                     } else {
-                        console.log(`File converted to ICO: ${icoPath}`);
+                        console.log(`ICO file saved to: ${icoPath}`);
                         event.reply('conversion-complete', `File converted: ${icoPath}`);
                     }
                 });
-        }
+            })
+            .catch((err) => {
+                console.error(`Error converting to ICO: ${err.message}`);
+                event.reply('conversion-complete', `Error: ${err.message}`);
+            });
     });
 });
 
